@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-Script de teste para o módulo FAISS
-Demonstra adição de documentos, busca, e gerenciamento de índices
-"""
-
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

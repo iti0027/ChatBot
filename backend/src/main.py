@@ -378,9 +378,6 @@ class FAISSStatistics(BaseModel):
 
 @app.post("/faiss/add", response_model=dict)
 def faiss_add_documents(request: FAISSAddRequest):
-    """
-    Adicionar documentos ao índice FAISS de uma categoria
-    """
     try:
         logger.info(f"FAISS: Adicionando {len(request.documents)} docs à categoria '{request.category}'")
         result = add_documents_to_faiss(request.category, request.documents)
@@ -401,9 +398,6 @@ def faiss_add_documents(request: FAISSAddRequest):
 
 @app.post("/faiss/search", response_model=FAISSSearchResponse)
 def faiss_search(request: FAISSSearchRequest):
-    """
-    Buscar documentos usando FAISS
-    """
     try:
         logger.info(f"FAISS: Buscando '{request.query}' (categoria: {request.category})")
         results = search_with_faiss(
@@ -437,9 +431,6 @@ def faiss_search(request: FAISSSearchRequest):
 
 @app.get("/faiss/stats", response_model=FAISSStatistics)
 def faiss_statistics():
-    """
-    Obter estatísticas dos índices FAISS
-    """
     try:
         stats = get_faiss_statistics()
         return FAISSStatistics(**stats)
@@ -453,9 +444,6 @@ def faiss_statistics():
 
 @app.delete("/faiss/category/{category}")
 def faiss_clear_category(category: str):
-    """
-    Limpar uma categoria específica do FAISS
-    """
     try:
         logger.warning(f"FAISS: Limpando categoria '{category}'")
         clear_faiss_category(category)
@@ -474,9 +462,6 @@ def faiss_clear_category(category: str):
 
 @app.delete("/faiss/all")
 def faiss_clear_all():
-    """
-    Limpar todos os índices FAISS
-    """
     try:
         logger.warning("FAISS: Limpando TODOS os índices")
         clear_all_faiss()

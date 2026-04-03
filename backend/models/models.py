@@ -72,3 +72,67 @@ class ChunkResponse(BaseModel):
     original_text: str = Field(..., description="Texto original que foi dividido em chunks")
     chunks: List[Chunk] = Field(..., description="Lista de chunks gerados")
     total_chunks: int = Field(..., description="Número total de chunks gerados")
+
+
+# ========== DATABASE MODELS ==========
+
+# Documento armazenado no banco de dados
+class DocumentResponse(BaseModel):
+    id: int = Field(..., description="ID único do documento")
+    title: str = Field(..., description="Título do documento")
+    content: str = Field(..., description="Conteúdo do documento")
+    source: str = Field(..., description="Fonte do documento (manual, scraped, uploaded)")
+    category: str = Field(..., description="Categoria do documento")
+    created_at: str = Field(..., description="Data de criação")
+    embedding_vector_id: Optional[int] = Field(None, description="ID do vetor no FAISS")
+
+    class Config:
+        from_attributes = True
+
+
+# Mensagem de conversa
+class MessageResponse(BaseModel):
+    id: int = Field(..., description="ID única da mensagem")
+    session_id: str = Field(..., description="ID da sessão")
+    user_query: str = Field(..., description="Pergunta do usuário")
+    llm_response: Optional[str] = Field(None, description="Resposta do LLM")
+    retrieved_documents: Optional[List[int]] = Field(None, description="IDs dos documentos recuperados")
+    model_used: Optional[str] = Field(None, description="Modelo LLM utilizado")
+    created_at: str = Field(..., description="Data de criação")
+
+    class Config:
+        from_attributes = True
+
+
+# Sessão do usuário
+class SessionResponse(BaseModel):
+    id: int = Field(..., description="ID único da sessão")
+    session_id: str = Field(..., description="ID da sessão (UUID)")
+    user_id: Optional[str] = Field(None, description="ID do usuário (opcional)")
+    created_at: str = Field(..., description="Data de criação")
+    updated_at: str = Field(..., description="Data de atualização")
+    is_active: bool = Field(..., description="Se a sessão está ativa")
+    message_count: Optional[int] = Field(None, description="Número de mensagens na sessão")
+
+    class Config:
+        from_attributes = True
+
+
+# Histórico de conversa (múltiplas mensagens)
+class ConversationHistoryResponse(BaseModel):
+    session_id: str = Field(..., description="ID da sessão")
+    messages: List[MessageResponse] = Field(..., description="Lista de mensagens")
+    total_messages: int = Field(..., description="Total de mensagens")
+    oldest_message: Optional[str] = Field(None, description="Data da mensagem mais antiga")
+    newest_message: Optional[str] = Field(None, description="Data da mensagem mais recente")
+
+
+# Estatísticas do banco de dados
+class DatabaseStatsResponse(BaseModel):
+    total_documents: int = Field(..., description="Total de documentos no banco")
+    documents_by_category: dict = Field(..., description="Documentos agrupados por categoria")
+    total_sessions: int = Field(..., description="Total de sessões")
+    active_sessions: int = Field(..., description="Sessões ativas")
+    total_messages: int = Field(..., description="Total de mensagens")
+    oldest_document: Optional[str] = Field(None, description="Data do documento mais antigo")
+    database_size: Optional[str] = Field(None, description="Tamanho do banco em MB")

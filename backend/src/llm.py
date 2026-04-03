@@ -103,12 +103,6 @@ class OllamaClient:
             return f"Erro: {str(e)}"
     
     def list_available_models(self) -> list:
-        """
-        Listar modelos disponíveis no Ollama
-        
-        Returns:
-            Lista de nomes de modelos
-        """
         try:
             response = requests.get(f"{self.config.base_url}/api/tags", timeout=5)
             if response.status_code == 200:
