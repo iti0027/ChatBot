@@ -21,7 +21,9 @@ from graph import build_chatbot_graph, ChatState
 from graph.state import GraphConfig, Message
 from data_loader import (
     add_urls, add_manual_document,
-    get_all_documents, document_count, clear_documents
+    get_all_documents, document_count, clear_documents,
+    add_documents_to_faiss, search_with_faiss, 
+    get_faiss_statistics, clear_faiss_category, clear_all_faiss
 )
 
 # Configurar logging
@@ -226,7 +228,7 @@ def chat(request: ChatbotRequest):
 # ==================== ENDPOINTS DE DOCUMENTOS ====================
 
 class AddUrlsRequest(BaseModel):
-    urls: List[str] = Field(..., description="Lista de URLs para fazer scraping", min_items=1)
+    urls: List[str] = Field(..., description="Lista de URLs para fazer scraping", min_length=1)
 
 
 class AddUrlsResponse(BaseModel):
@@ -332,6 +334,163 @@ def clear_all_documents():
             status_code=500,
             detail=f"Erro ao limpar documentos: {str(e)}"
         )
+
+
+# ============ FAISS Endpoints ============
+
+class FAISSAddRequest(BaseModel):
+    category: str = Field(..., description="Nome da categoria", min_length=1)
+    documents: List[dict] = Field(..., description="Lista de documentos com título e conteúdo", min_length=1)
+
+
+class FAISSSearchRequest(BaseModel):
+    query: str = Field(..., description="Texto da busca", min_length=1)
+    category: Optional[str] = Field(None, description="Categoria específica (opcional)")
+    top_k: Optional[int] = Field(5, description="Número de resultados", ge=1, le=100)
+
+
+class FAISSSearchResult(BaseModel):
+    document: dict
+    similarity: float
+    category: str
+    rank: int
+
+
+class FAISSSearchResponse(BaseModel):
+    query: str
+    results: List[FAISSSearchResult]
+    total_results: int
+
+
+class FAISSCategoryStats(BaseModel):
+    category: str
+    total_documents: int
+    index_size: int
+    embedding_dim: int
+    dirty: bool
+
+
+class FAISSStatistics(BaseModel):
+    total_categories: int
+    total_documents: int
+    categories: dict
+
+
+@app.post("/faiss/add", response_model=dict)
+def faiss_add_documents(request: FAISSAddRequest):
+    """
+    Adicionar documentos ao índice FAISS de uma categoria
+    """
+    try:
+        logger.info(f"FAISS: Adicionando {len(request.documents)} docs à categoria '{request.category}'")
+        result = add_documents_to_faiss(request.category, request.documents)
+        return {
+            "success": True,
+            "message": f"Adicionados {result['added']} documentos",
+            "category": request.category,
+            "added": result['added'],
+            "total": result['total']
+        }
+    except Exception as e:
+        logger.error(f"Erro ao adicionar docs ao FAISS: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao adicionar documentos: {str(e)}"
+        )
+
+
+@app.post("/faiss/search", response_model=FAISSSearchResponse)
+def faiss_search(request: FAISSSearchRequest):
+    """
+    Buscar documentos usando FAISS
+    """
+    try:
+        logger.info(f"FAISS: Buscando '{request.query}' (categoria: {request.category})")
+        results = search_with_faiss(
+            query=request.query,
+            category=request.category,
+            top_k=request.top_k
+        )
+        
+        faiss_results = [
+            FAISSSearchResult(
+                document=result['document'],
+                similarity=result['similarity'],
+                category=result['category'],
+                rank=result['rank']
+            )
+            for result in results
+        ]
+        
+        return FAISSSearchResponse(
+            query=request.query,
+            results=faiss_results,
+            total_results=len(faiss_results)
+        )
+    except Exception as e:
+        logger.error(f"Erro ao buscar no FAISS: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao buscar: {str(e)}"
+        )
+
+
+@app.get("/faiss/stats", response_model=FAISSStatistics)
+def faiss_statistics():
+    """
+    Obter estatísticas dos índices FAISS
+    """
+    try:
+        stats = get_faiss_statistics()
+        return FAISSStatistics(**stats)
+    except Exception as e:
+        logger.error(f"Erro ao obter estatísticas FAISS: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao obter estatísticas: {str(e)}"
+        )
+
+
+@app.delete("/faiss/category/{category}")
+def faiss_clear_category(category: str):
+    """
+    Limpar uma categoria específica do FAISS
+    """
+    try:
+        logger.warning(f"FAISS: Limpando categoria '{category}'")
+        clear_faiss_category(category)
+        return {
+            "success": True,
+            "message": f"Categoria '{category}' foi limpa",
+            "category": category
+        }
+    except Exception as e:
+        logger.error(f"Erro ao limpar categoria FAISS: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao limpar categoria: {str(e)}"
+        )
+
+
+@app.delete("/faiss/all")
+def faiss_clear_all():
+    """
+    Limpar todos os índices FAISS
+    """
+    try:
+        logger.warning("FAISS: Limpando TODOS os índices")
+        clear_all_faiss()
+        return {
+            "success": True,
+            "message": "Todos os índices FAISS foram limpos"
+        }
+    except Exception as e:
+        logger.error(f"Erro ao limpar todos os índices FAISS: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao limpar índices: {str(e)}"
+        )
+
 
 # Handler global de erros
 @app.exception_handler(HTTPException)

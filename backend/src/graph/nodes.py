@@ -4,7 +4,7 @@ from datetime import datetime
 
 from similarity import Similarity
 from llm import OllamaClient, OllamaConfig
-from data_loader import get_content_for_retrieval, get_all_documents
+from data_loader import get_content_for_retrieval, get_all_documents, search_with_faiss
 from .state import ChatState, Message
 
 logger = logging.getLogger(__name__)
@@ -35,49 +35,44 @@ class ChatbotNodes:
     
     def retriever_node(self, state: ChatState) -> ChatState:
         try:
-            logger.info(f"Retriever: Processando query: {state.user_query}")
+            logger.info(f"Retriever: Processando query com FAISS: {state.user_query}")
             
-            # Obter conteúdos do data_loader
-            content_list = get_content_for_retrieval()
+            # Buscar com FAISS (busca rápida em índices por categoria)
+            retrieved_docs_faiss = search_with_faiss(
+                query=state.user_query,
+                top_k=self.config.max_retrieved_docs
+            )
             
-            if not content_list:
-                logger.warning("Nenhum documento disponível para retrieval")
+            if not retrieved_docs_faiss:
+                logger.warning("Nenhum documento encontrado com FAISS")
                 state.retrieved_documents = []
                 state.retrieved_text = ""
                 return state
             
-            # Usar similaridade para recuperar os melhores documentos
-            results = self.similarity_model.find_most_similar(
-                query=state.user_query,
-                texts=content_list,
-                top_k=min(self.config.max_retrieved_docs, len(content_list))
-            )
-            
-            # Obter documentos completos do data_loader
-            all_docs = get_all_documents()
-            
-            # Mapear resultados para documentos com metadados
+            # Mapear resultados do FAISS
             retrieved_docs = []
             retrieved_text_parts = []
             
-            for result in results:
-                doc_idx = result["index"]
-                if doc_idx < len(all_docs):
-                    doc = all_docs[doc_idx]
-                    doc["similarity_score"] = result["similarity"]
-                    retrieved_docs.append(doc)
-                    title = doc.get("title", "Sem título")
-                    content = doc.get("content", "")[:200]  # Limitar a 200 chars
-                    retrieved_text_parts.append(f"[{title}]: {content}...")
+            for result in retrieved_docs_faiss:
+                doc = result['document']
+                doc['similarity_score'] = result['similarity']
+                doc['category'] = result.get('category', 'unknown')
+                retrieved_docs.append(doc)
+                
+                title = doc.get("title", "Sem título")
+                content = doc.get("content", "")[:200]  # Limitar a 200 chars
+                category_label = f"[{result.get('category', 'unknown')}]"
+                similarity_label = f"({result['similarity']:.2%})"
+                retrieved_text_parts.append(f"{category_label} {similarity_label} {title}: {content}...")
             
             state.retrieved_documents = retrieved_docs
             state.retrieved_text = "\n".join(retrieved_text_parts)
             
-            logger.info(f"Retriever: {len(retrieved_docs)} documentos recuperados")
+            logger.info(f"Retriever: {len(retrieved_docs)} documentos recuperados com FAISS")
             return state
             
         except Exception as e:
-            logger.error(f"Erro no retriever: {str(e)}")
+            logger.error(f"Erro no retriever com FAISS: {str(e)}")
             state.error = f"Erro ao recuperar: {str(e)}"
             return state
     

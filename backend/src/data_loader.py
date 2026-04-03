@@ -1,10 +1,12 @@
 """
 Gerenciador de Documentos Global
 Mantém os documentos disponíveis para o retriever
+Integra com FAISS para buscas otimizadas por categoria
 """
 
 import logging
 from scraper import DocumentStore, WebScraper
+from faiss_manager import get_faiss_manager
 from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -118,6 +120,81 @@ def document_count() -> int:
     return store.count()
 
 
+# ============ FAISS Integration ============
+
+def add_documents_to_faiss(category: str, documents: List[Dict]) -> Dict:
+    """
+    Adicionar documentos ao índice FAISS de uma categoria
+    
+    Args:
+        category: Nome da categoria (ex: 'manual', 'scraped', 'chat_history')
+        documents: Lista de dicts com {'title', 'content', 'source', ...}
+        
+    Returns:
+        Estatísticas de adição
+    """
+    manager = get_faiss_manager()
+    result = manager.add_documents(category, documents)
+    logger.info(f"FAISS [{category}] Adicionados {result['added']} documentos. Total: {result['total']}")
+    return result
+
+
+def search_with_faiss(query: str, category: Optional[str] = None, top_k: int = 5) -> Dict:
+    """
+    Buscar documentos usando FAISS
+    
+    Args:
+        query: Texto da busca
+        category: Categoria específica (None = todas)
+        top_k: Número de resultados por categoria
+        
+    Returns:
+        Dict com resultados organizados por categoria
+    """
+    manager = get_faiss_manager()
+    results = manager.search(query, category, top_k)
+    
+    # Flattena resultados para o formato esperado pelo retriever
+    all_results = []
+    for cat, cat_results in results.items():
+        for result in cat_results:
+            all_results.append({
+                'document': result['document'],
+                'similarity': result['similarity'],
+                'category': cat,
+                'rank': result['rank']
+            })
+    
+    # Ordena por similaridade
+    all_results.sort(key=lambda x: x['similarity'], reverse=True)
+    return all_results[:top_k]
+
+
+def get_faiss_statistics() -> Dict:
+    """Obter estatísticas dos índices FAISS"""
+    manager = get_faiss_manager()
+    return manager.get_statistics()
+
+
+def clear_faiss_category(category: str):
+    """Limpar uma categoria do FAISS"""
+    manager = get_faiss_manager()
+    manager.clear_category(category)
+    logger.info(f"FAISS [{category}] Limpado")
+
+
+def clear_all_faiss():
+    """Limpar todos os índices FAISS"""
+    manager = get_faiss_manager()
+    manager.clear_all()
+
+
+def save_all_faiss():
+    """Salvar todos os índices FAISS"""
+    manager = get_faiss_manager()
+    manager.save_all()
+
+
 # Exports
 __all__ = [
     "get_document_store",
@@ -129,4 +206,11 @@ __all__ = [
     "get_default_documents",
     "clear_documents",
     "document_count",
+    # FAISS functions
+    "add_documents_to_faiss",
+    "search_with_faiss",
+    "get_faiss_statistics",
+    "clear_faiss_category",
+    "clear_all_faiss",
+    "save_all_faiss",
 ]
