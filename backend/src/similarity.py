@@ -49,7 +49,7 @@ if __name__ == "__main__":
         "FC Barcelona é o maior rival do FC Real Madrid."
     ]
 
-    query = "Real Madrid"
+    query = "Sport club do recife"
 
     print(f"Query: {query}")
     print(f"Textos mais similares:")

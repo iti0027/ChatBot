@@ -5,7 +5,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from typing import Optional
+from typing import Optional, List
+import logging
+from pydantic import BaseModel, Field
 
 # Importar módulos locais
 from similarity import Similarity
@@ -15,6 +17,12 @@ from models import (
     EmbeddingRequest, EmbeddingResponse,
     HealthResponse, ErrorResponse
 )
+from graph import build_chatbot_graph, ChatState
+from graph.state import GraphConfig, Message
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Instância da aplicação FastAPI
 app = FastAPI(
@@ -31,6 +39,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Instância global do grafo (construído uma vez)
+chatbot_graph = None
+graph_config = None
+
+def get_chatbot_graph():
+    """Obter ou criar instância do grafo"""
+    global chatbot_graph, graph_config
+    if chatbot_graph is None:
+        try:
+            graph_config = GraphConfig()
+            chatbot_graph = build_chatbot_graph(graph_config)
+            logger.info("Grafo LangGraph inicializado")
+        except Exception as e:
+            logger.error(f"Erro ao inicializar grafo: {e}")
+    return chatbot_graph
 
 # Instância global do modelo de similaridade (carregado uma vez)
 similarity_model: Optional[Similarity] = None
@@ -145,6 +169,85 @@ def generate_embedding(request: EmbeddingRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao gerar embedding: {str(e)}"
+        )
+
+# Endpoints do Chatbot com LangGraph
+class ChatbotRequest(BaseModel):
+    """Requisição para o chatbot"""
+    query: str = Field(..., description="Pergunta do usuário", min_length=1)
+    session_id: Optional[str] = Field(None, description="ID da sessão para histórico")
+
+
+class MessageResponse(BaseModel):
+    """Resposta individual no histórico"""
+    role: str
+    content: str
+    timestamp: Optional[str] = None
+
+
+class ChatbotResponse(BaseModel):
+    """Resposta do chatbot com histórico"""
+    query: str
+    response: str
+    retrieved_docs: int
+    model_used: str
+    history: List[MessageResponse]
+    error: Optional[str] = None
+
+
+@app.post("/chat", response_model=ChatbotResponse)
+def chat(request: ChatbotRequest):
+    """
+    Endpoint principal do chatbot usando LangGraph
+    
+    - **query**: Pergunta do usuário
+    - **session_id**: ID da sessão (opcional, para histórico)
+    """
+    try:
+        logger.info(f"Chat request: {request.query}")
+        
+        # Obter grafo
+        graph = get_chatbot_graph()
+        
+        if graph is None:
+            raise Exception("Falha ao inicializar o grafo")
+        
+        # Criar estado inicial
+        initial_state = ChatState(
+            user_query=request.query,
+            session_id=request.session_id or "default"
+        )
+        
+        # Executar grafo (retorna dict)
+        final_state_dict = graph.invoke(initial_state.model_dump())
+        
+        # Converter dict de volta para ChatState
+        final_state = ChatState(**final_state_dict)
+        
+        # Construir resposta
+        history_response = [
+            MessageResponse(
+                role=msg.role,
+                content=msg.content,
+                timestamp=msg.timestamp.isoformat() if msg.timestamp else None
+            )
+            for msg in final_state.conversation_history
+        ]
+        
+        return ChatbotResponse(
+            query=final_state.user_query,
+            response=final_state.final_response,
+            retrieved_docs=len(final_state.retrieved_documents),
+            model_used=final_state.model_used,
+            history=history_response,
+            error=final_state.error
+        )
+        
+    except Exception as e:
+        logger.error(f"Erro no endpoint /chat: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar chat: {str(e)}"
         )
 
 # Handler global de erros
