@@ -3,6 +3,8 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 from similarity import Similarity
+from llm import OllamaClient, OllamaConfig
+from data_loader import get_content_for_retrieval, get_all_documents
 from .state import ChatState, Message
 
 logger = logging.getLogger(__name__)
@@ -13,6 +15,21 @@ class ChatbotNodes:
     def __init__(self, config: "GraphConfig"):  # noqa
         self.config = config
         self.similarity_model = Similarity()
+        
+        # Inicializar cliente Ollama
+        ollama_config = OllamaConfig(
+            base_url=config.llm_base_url,
+            model=config.llm_model,
+            temperature=config.llm_temperature
+        )
+        self.llm_client = OllamaClient(ollama_config)
+        
+        # Verificar saúde do Ollama
+        if self.llm_client.check_health():
+            logger.info("✓ Ollama estava disponível")
+        else:
+            logger.warning("⚠ Ollama não está disponível - usando modo fallback")
+        
         self.retrieved_docs = []  # Cache de documentos
         logger.info("Nós do chatbot inicializados")
     
@@ -20,33 +37,38 @@ class ChatbotNodes:
         try:
             logger.info(f"Retriever: Processando query: {state.user_query}")
             
-            # Se não temos documentos em cache, podemos simular ou buscar de uma fonte
-            # Aqui vamos simular alguns documentos para demo
-            sample_docs = [
-                {"id": 1, "title": "Python Basics", "content": "Python é uma linguagem de programação versátil e poderosa."},
-                {"id": 2, "title": "Web Development", "content": "FastAPI é um framework moderno para criar APIs REST em Python."},
-                {"id": 3, "title": "Machine Learning", "content": "LangGraph é uma ferramenta para orquestrar fluxos de IA."},
-                {"id": 4, "title": "NLP", "content": "Embeddings são representações vetoriais de texto usadas em busca semântica."},
-            ]
+            # Obter conteúdos do data_loader
+            content_list = get_content_for_retrieval()
+            
+            if not content_list:
+                logger.warning("Nenhum documento disponível para retrieval")
+                state.retrieved_documents = []
+                state.retrieved_text = ""
+                return state
             
             # Usar similaridade para recuperar os melhores documentos
-            texts = [doc["content"] for doc in sample_docs]
             results = self.similarity_model.find_most_similar(
                 query=state.user_query,
-                texts=texts,
-                top_k=self.config.max_retrieved_docs
+                texts=content_list,
+                top_k=min(self.config.max_retrieved_docs, len(content_list))
             )
             
-            # Mapear resultados para documentos
+            # Obter documentos completos do data_loader
+            all_docs = get_all_documents()
+            
+            # Mapear resultados para documentos com metadados
             retrieved_docs = []
             retrieved_text_parts = []
             
             for result in results:
                 doc_idx = result["index"]
-                doc = sample_docs[doc_idx]
-                doc["similarity_score"] = result["similarity"]
-                retrieved_docs.append(doc)
-                retrieved_text_parts.append(f"[{doc['title']}]: {doc['content']}")
+                if doc_idx < len(all_docs):
+                    doc = all_docs[doc_idx]
+                    doc["similarity_score"] = result["similarity"]
+                    retrieved_docs.append(doc)
+                    title = doc.get("title", "Sem título")
+                    content = doc.get("content", "")[:200]  # Limitar a 200 chars
+                    retrieved_text_parts.append(f"[{title}]: {content}...")
             
             state.retrieved_documents = retrieved_docs
             state.retrieved_text = "\n".join(retrieved_text_parts)
@@ -98,15 +120,11 @@ Responda com base no contexto fornecido. Se não tiver informações suficientes
         try:
             logger.info(f"LLM Node: Chamando {self.config.llm_model}")
             
-            # Para demo, vamos simular uma resposta do LLM
-            # Em produção, chamar Ollama via requests ou langchain
-            llm_response = f"""Baseado na informação fornecida:
-
-{state.retrieved_text if state.retrieved_text else 'Sem contexto específico.'}
-
-Respondendo à sua pergunta sobre "{state.user_query}":
-
-A resposta depende do contexto específico. Recomendo consultar a documentação para mais detalhes."""
+            # Chamar Ollama para gerar resposta
+            llm_response = self.llm_client.generate(
+                prompt=state.llm_input,
+                system_prompt="Você é um assistente inteligente e útil. Responda sucintamente com base no contexto fornecido."
+            )
             
             state.llm_response = llm_response
             state.model_used = self.config.llm_model

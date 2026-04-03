@@ -19,6 +19,10 @@ from models import (
 )
 from graph import build_chatbot_graph, ChatState
 from graph.state import GraphConfig, Message
+from data_loader import (
+    add_urls, add_manual_document,
+    get_all_documents, document_count, clear_documents
+)
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -34,18 +38,16 @@ app = FastAPI(
 # Configurar CORS para aceitar requisições front-end
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, especificar os domínios permitidos
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Instância global do grafo (construído uma vez)
 chatbot_graph = None
 graph_config = None
 
 def get_chatbot_graph():
-    """Obter ou criar instância do grafo"""
     global chatbot_graph, graph_config
     if chatbot_graph is None:
         try:
@@ -60,7 +62,6 @@ def get_chatbot_graph():
 similarity_model: Optional[Similarity] = None
 
 def get_similarity_model() -> Similarity:
-    """Obter ou criar instância do modelo de similaridade"""
     global similarity_model
     if similarity_model is None:
         try:
@@ -75,7 +76,6 @@ def get_similarity_model() -> Similarity:
 #rotas de verificação básicas
 @app.get("/")
 def read_root():
-    """Rota raiz para verificar se a API está online"""
     return {
         "message": "ChatBot API está online",
         "version": "0.1.0",
@@ -85,7 +85,6 @@ def read_root():
 
 @app.get("/health", response_model=HealthResponse)
 def health_check():
-    """Verificar saúde da API e status do modelo"""
     try:
         model = get_similarity_model()
         model_loaded = True
@@ -101,12 +100,6 @@ def health_check():
 # Endpoints de similaridade
 @app.post("/similarity", response_model=SimilarityResponse)
 def calculate_similarity(request: SimilarityRequest):
-    """
-    Calcular similaridade entre dois textos
-
-    - **text1**: Primeiro texto para comparação
-    - **text2**: Segundo texto para comparação
-    """
     try:
         model = get_similarity_model()
         similarity_score = model.calculate_similarity(request.text1, request.text2)
@@ -124,13 +117,6 @@ def calculate_similarity(request: SimilarityRequest):
 
 @app.post("/search", response_model=SearchResponse)
 def search_similar_texts(request: SearchRequest):
-    """
-    Encontrar textos mais similares a uma query
-
-    - **query**: Texto de busca
-    - **texts**: Lista de textos para comparar
-    - **top_k**: Número de resultados (padrão 5, máximo 100)
-    """
     try:
         model = get_similarity_model()
         results = model.find_most_similar(
@@ -152,11 +138,6 @@ def search_similar_texts(request: SearchRequest):
 
 @app.post("/embedding", response_model=EmbeddingResponse)
 def generate_embedding(request: EmbeddingRequest):
-    """
-    Gerar embedding (vetor) para um texto
-
-    - **text**: Texto para gerar embedding
-    """
     try:
         model = get_similarity_model()
         embedding = model.get_embedding(request.text)
@@ -173,20 +154,17 @@ def generate_embedding(request: EmbeddingRequest):
 
 # Endpoints do Chatbot com LangGraph
 class ChatbotRequest(BaseModel):
-    """Requisição para o chatbot"""
     query: str = Field(..., description="Pergunta do usuário", min_length=1)
     session_id: Optional[str] = Field(None, description="ID da sessão para histórico")
 
 
 class MessageResponse(BaseModel):
-    """Resposta individual no histórico"""
     role: str
     content: str
     timestamp: Optional[str] = None
 
 
 class ChatbotResponse(BaseModel):
-    """Resposta do chatbot com histórico"""
     query: str
     response: str
     retrieved_docs: int
@@ -197,12 +175,6 @@ class ChatbotResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatbotResponse)
 def chat(request: ChatbotRequest):
-    """
-    Endpoint principal do chatbot usando LangGraph
-    
-    - **query**: Pergunta do usuário
-    - **session_id**: ID da sessão (opcional, para histórico)
-    """
     try:
         logger.info(f"Chat request: {request.query}")
         
@@ -248,6 +220,117 @@ def chat(request: ChatbotRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao processar chat: {str(e)}"
+        )
+
+
+# ==================== ENDPOINTS DE DOCUMENTOS ====================
+
+class AddUrlsRequest(BaseModel):
+    urls: List[str] = Field(..., description="Lista de URLs para fazer scraping", min_items=1)
+
+
+class AddUrlsResponse(BaseModel):
+    urls_tentadas: int
+    urls_sucesso: int
+    documentos_adicionados: int
+    total_documentos: int
+
+
+class AddDocumentRequest(BaseModel):
+    title: str = Field(..., description="Título do documento", min_length=1)
+    content: str = Field(..., description="Conteúdo do documento", min_length=1)
+    source: str = Field(default="manual", description="Fonte do documento")
+
+
+class DocumentInfo(BaseModel):
+    id: int
+    title: str
+    content: str
+    source: str
+    similarity_score: Optional[float] = None
+
+
+class DocumentsListResponse(BaseModel):
+    total: int
+    documents: List[DocumentInfo]
+
+
+@app.post("/documents/add-urls", response_model=AddUrlsResponse)
+def add_urls_endpoint(request: AddUrlsRequest):
+    try:
+        logger.info(f"Adicionando {len(request.urls)} URLs")
+        result = add_urls(request.urls)
+        return AddUrlsResponse(**result)
+    except Exception as e:
+        logger.error(f"Erro ao adicionar URLs: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao fazer scraping: {str(e)}"
+        )
+
+
+@app.post("/documents/add-manual", response_model=DocumentInfo)
+def add_manual_document_endpoint(request: AddDocumentRequest):
+    try:
+        logger.info(f"Adicionando documento manual: {request.title}")
+        doc = add_manual_document(
+            title=request.title,
+            content=request.content,
+            source=request.source
+        )
+        return DocumentInfo(**doc)
+    except Exception as e:
+        logger.error(f"Erro ao adicionar documento: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao adicionar documento: {str(e)}"
+        )
+
+
+@app.get("/documents", response_model=DocumentsListResponse)
+def list_documents():
+    try:
+        docs = get_all_documents()
+        return DocumentsListResponse(
+            total=len(docs),
+            documents=[DocumentInfo(**doc) for doc in docs]
+        )
+    except Exception as e:
+        logger.error(f"Erro ao listar documentos: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao listar documentos: {str(e)}"
+        )
+
+
+@app.get("/documents/count")
+def documents_count():
+    try:
+        count = document_count()
+        return {
+            "total_documents": count,
+            "message": f"Existem {count} documentos disponíveis"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao contar documentos: {str(e)}"
+        )
+
+
+@app.delete("/documents")
+def clear_all_documents():
+    try:
+        logger.warning("Limpando todos os documentos")
+        clear_documents()
+        return {
+            "message": "Todos os documentos foram removidos",
+            "total_documents": 0
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao limpar documentos: {str(e)}"
         )
 
 # Handler global de erros

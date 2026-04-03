@@ -4,7 +4,6 @@ from datetime import datetime
 
 
 class Message(BaseModel):
-    """Modelo de uma mensagem no histórico"""
     role: str = Field(..., description="Quem enviou: 'user' ou 'assistant'")
     content: str = Field(..., description="Conteúdo da mensagem")
     timestamp: datetime = Field(default_factory=datetime.now)
@@ -63,7 +62,6 @@ class ChatState(BaseModel):
 
 
 class GraphConfig(BaseModel):
-    """Configuração do grafo"""
     # LLM
     llm_model: str = Field(default="mistral", description="Modelo LLM local (Ollama)")
     llm_base_url: str = Field(default="http://localhost:11434", description="Endpoint do Ollama")
