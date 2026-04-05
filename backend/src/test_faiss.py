@@ -3,8 +3,8 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from faiss_manager import get_faiss_manager
-from data_loader import (
+from .faiss_manager import get_faiss_manager
+from .data_loader import (
     add_documents_to_faiss, search_with_faiss, 
     get_faiss_statistics, clear_all_faiss
 )

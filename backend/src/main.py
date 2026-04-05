@@ -10,16 +10,16 @@ import logging
 from pydantic import BaseModel, Field
 
 # Importar módulos locais
-from similarity import Similarity
+from .similarity import Similarity
 from models import (
     SimilarityRequest, SimilarityResponse,
     SearchRequest, SearchResponse,
     EmbeddingRequest, EmbeddingResponse,
     HealthResponse, ErrorResponse
 )
-from graph import build_chatbot_graph, ChatState
-from graph.state import GraphConfig, Message
-from data_loader import (
+from .graph import build_chatbot_graph, ChatState
+from .graph.state import GraphConfig, Message
+from .data_loader import (
     add_urls, add_manual_document,
     get_all_documents, document_count, clear_documents,
     add_documents_to_faiss, search_with_faiss, 
@@ -487,7 +487,7 @@ async def http_exception_handler(request, exc):
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        "backend.src.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True

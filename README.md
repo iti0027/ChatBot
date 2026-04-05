@@ -1,16 +1,13 @@
 # ChatBot
 
-Este projeto implementa um backend de chatbot em Python com:
-- LangGraph para orquestração de pipeline de chat
-- Ollama local como LLM
-- FAISS para busca vetorial por categoria
-- SQLite e/ou URL pública de banco de dados para persistência
-- FastAPI como API REST
-- Scraping de documentos e gerenciamento de conteúdo
+Este projeto implementa um chatbot completo com backend em Python e frontend em Next.js/React/TypeScript:
+- **Backend**: LangGraph para orquestração de pipeline de chat, Ollama local como LLM, FAISS para busca vetorial por categoria, SQLite e/ou URL pública de banco de dados para persistência, FastAPI como API REST, Scraping de documentos e gerenciamento de conteúdo
+- **Frontend**: Interface web em Next.js com React e TypeScript, utilizando Tailwind CSS para estilização
 
 
 ## Visão geral do que foi feito
 
+### Backend
 1. Criou-se um backend completo em `backend/src` com módulos organizados em:
    - `database.py`: configuração de banco e sessão SQLAlchemy
    - `repositories.py`: abstração de acesso a dados
@@ -47,6 +44,12 @@ Este projeto implementa um backend de chatbot em Python com:
    - validar o FAISS
    - validar a persistência em banco via `test_db_persistence.py`
 
+### Frontend
+1. Criou-se um frontend em Next.js com React e TypeScript para interface do usuário.
+2. Utiliza Tailwind CSS para estilização responsiva.
+3. Estrutura organizada em `app/` com layout e páginas.
+4. Pronto para integração com a API do backend.
+
 
 ## Estrutura do projeto
 
@@ -76,12 +79,27 @@ ChatBot/
 │  │     └─ __init__.py
 │  ├─ indices/                # índices FAISS salvos em disco
 │  └─ data/
-└─ frontend/                 # pasta reservada para frontend/TypeScript
+├─ frontend/
+│  ├─ package.json
+│  ├─ next.config.ts
+│  ├─ tsconfig.json
+│  ├─ eslint.config.mjs
+│  ├─ postcss.config.mjs
+│  ├─ tailwind.config.ts      # (se existir)
+│  ├─ app/
+│  │  ├─ layout.tsx
+│  │  ├─ page.tsx
+│  │  ├─ globals.css
+│  │  └─ app.css
+│  ├─ public/
+│  └─ README.md
+└─ tests/
 ```
 
 
 ## Dependências
 
+### Backend
 Instale as dependências do backend com:
 
 ```bash
@@ -89,15 +107,78 @@ cd backend
 pip install -r requirements.txt
 ```
 
+## Como executar
+
+### Backend
+1. Navegue para a pasta do backend:
+   ```bash
+   cd backend
+   ```
+
+2. Instale as dependências:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Inicialize o banco de dados (opcional, se necessário):
+   ```bash
+   python init_db.py
+   ```
+
+4. Execute o servidor FastAPI:
+   ```bash
+   python src/main.py
+   ```
+   O backend estará disponível em `http://localhost:8000`.
+
+### Frontend
+1. Navegue para a pasta do frontend:
+   ```bash
+   cd frontend
+   ```
+
+2. Instale as dependências:
+   ```bash
+   npm install
+   ```
+
+3. Execute o servidor de desenvolvimento:
+   ```bash
+   npm run dev
+   ```
+   O frontend estará disponível em `http://localhost:3000`.
+
+### Executando ambos simultaneamente
+Para executar o backend e frontend ao mesmo tempo, abra dois terminais:
+
+- Terminal 1 (Backend):
+  ```bash
+  cd backend
+  python src/main.py
+  ```
+
+- Terminal 2 (Frontend):
+  ```bash
+  cd frontend
+  npm run dev
+  ```
+
+Certifique-se de que o Ollama esteja rodando localmente para o funcionamento completo do chatbot.
+
+### Frontend
+Instale as dependências do frontend com:
+
+```bash
+cd frontend
+npm install
+```
+
 As principais bibliotecas usadas são:
-- `fastapi` / `uvicorn`
-- `sqlalchemy`
-- `python-dotenv`
-- `langgraph`
-- `sentence-transformers`
-- `faiss-cpu`
-- `ollama`
-- `beautifulsoup4`
+- `next` (16.2.2)
+- `react` (19.2.4)
+- `react-dom` (19.2.4)
+- `tailwindcss` (^4)
+- `typescript` (^5)
 - `requests`
 
 
@@ -272,8 +353,3 @@ O backend salva documentos em banco e mantém também um cache em memória para 
 - O arquivo `.env.example` agora está na raiz do projeto.
 - Para rodar em outros computadores, basta compartilhar o código e um `.env` com a URL pública do banco.
 - Se quiser usar SQLite local para testes, não é necessário definir `DATABASE_URL`.
-
-
----
-
-Se você quiser, posso também gerar um `README` para o frontend e um guia de uso com exemplos de `curl` para cada endpoint.

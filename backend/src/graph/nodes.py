@@ -2,9 +2,9 @@ import logging
 from typing import Dict, Any, List
 from datetime import datetime
 
-from similarity import Similarity
-from llm import OllamaClient, OllamaConfig
-from data_loader import get_content_for_retrieval, get_all_documents, search_with_faiss
+from ..similarity import Similarity
+from ..llm import OllamaClient, OllamaConfig
+from ..data_loader import get_content_for_retrieval, get_all_documents, search_with_faiss
 from .state import ChatState, Message
 
 logger = logging.getLogger(__name__)
