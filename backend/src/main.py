@@ -249,6 +249,8 @@ class DocumentInfo(BaseModel):
     title: str
     content: str
     source: str
+    category: str
+    created_at: Optional[str] = None
     similarity_score: Optional[float] = None
 
 
@@ -484,11 +486,3 @@ async def http_exception_handler(request, exc):
         "error": exc.detail,
         "status_code": exc.status_code
     }
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "backend.src.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )

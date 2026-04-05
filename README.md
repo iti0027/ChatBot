@@ -100,6 +100,115 @@ ChatBot/
 ## Dependências
 
 ### Backend
+- Python 3.8+
+- Ollama (para LLM local)
+- SQLite (padrão) ou qualquer banco compatível com SQLAlchemy
+
+### Frontend
+- Node.js 18+
+- npm ou yarn
+
+## Como executar
+
+### Backend
+
+1. **Instalar dependências**:
+   ```bash
+   cd backend
+   python3 -m venv .venv
+   source .venv/bin/activate  # No Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+2. **Inicializar banco de dados** (opcional, é feito automaticamente na primeira execução):
+   ```bash
+   python init_db.py
+   ```
+
+3. **Executar o servidor** (sempre com uvicorn):
+   - **Para desenvolvimento** (com reload automático):
+     ```bash
+     # Da raiz do projeto
+     uvicorn backend.src.main:app --reload --host 0.0.0.0 --port 8000
+     ```
+     Ou, se estiver dentro da pasta backend:
+     ```bash
+     cd backend
+     uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+     ```
+
+   - **Para produção** (sem reload):
+     ```bash
+     uvicorn backend.src.main:app --host 0.0.0.0 --port 8000
+     ```
+
+4. **Verificar se está funcionando**:
+   - Abra http://localhost:8000/docs para ver a documentação da API
+   - Ou acesse http://localhost:8000/health para verificar saúde
+
+5. **Teste o chat** (opcional):
+   ```bash
+   curl -X POST "http://localhost:8000/chat" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "Olá, como você está?"}'
+   ```
+
+### Frontend
+
+1. **Instalar dependências**:
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+2. **Executar o servidor de desenvolvimento**:
+   ```bash
+   npm run dev
+   ```
+
+3. **Acessar**:
+   - Abra http://localhost:3000 no navegador
+
+## Configuração
+
+### Variáveis de ambiente
+Crie um arquivo `.env` na raiz do projeto com:
+```
+DATABASE_URL=sqlite:///./chatbot.db  # ou sua URL de banco
+DB_ECHO=false  # true para debug SQL
+OLLAMA_BASE_URL=http://localhost:11434  # URL do Ollama
+```
+
+### Ollama
+Certifique-se de que o Ollama está rodando localmente:
+```bash
+ollama serve
+```
+
+E baixe um modelo, ex.:
+```bash
+ollama pull llama3.2:1b  # Modelo padrão configurado
+```
+
+Ou outros modelos disponíveis:
+```bash
+ollama pull llama3.2     # Versão maior
+ollama pull mistral      # Modelo alternativo
+```
+
+## Uso da API
+
+### Endpoints principais
+- `GET /health` - Verificar saúde
+- `POST /chat` - Conversar com o chatbot
+- `POST /documents` - Adicionar documentos
+- `GET /documents` - Listar documentos
+- `POST /search` - Buscar documentos
+- `GET /faiss/stats` - Estatísticas FAISS
+
+Veja a documentação completa em `/docs` quando o servidor estiver rodando.
+
+### Backend
 Instale as dependências do backend com:
 
 ```bash

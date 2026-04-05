@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 # Configurações para o cliente Ollama
 class OllamaConfig(BaseModel):
     base_url: str = "http://localhost:11434"
-    model: str = "mistral"
+    model: str = "llama3.2:1b"
     temperature: float = 0.7
     top_p: float = 0.9
     top_k: int = 40

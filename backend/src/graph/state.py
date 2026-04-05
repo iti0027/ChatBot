@@ -63,7 +63,7 @@ class ChatState(BaseModel):
 
 class GraphConfig(BaseModel):
     # LLM
-    llm_model: str = Field(default="mistral", description="Modelo LLM local (Ollama)")
+    llm_model: str = Field(default="llama3.2:1b", description="Modelo LLM local (Ollama)")
     llm_base_url: str = Field(default="http://localhost:11434", description="Endpoint do Ollama")
     llm_temperature: float = Field(default=0.7, ge=0, le=1)
     
